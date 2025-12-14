@@ -2,16 +2,32 @@
 # DATA SOURCES
 #############################
 
-# Get the default VPC in this region/account
+# Default VPC
 data "aws_vpc" "default" {
   default = true
 }
 
-# Get all subnets in that default VPC
-data "aws_subnets" "default_vpc_subnets" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
+# All available AZs in this region
+data "aws_availability_zones" "available" {
+  state = "available"
+}
+
+#############################
+# NETWORKING FOR EKS
+#############################
+
+# Create 2 subnets in different AZs in the default VPC
+resource "aws_subnet" "eks_subnet" {
+  count = 2
+
+  vpc_id            = data.aws_vpc.default.id
+  cidr_block        = cidrsubnet(data.aws_vpc.default.cidr_block, 8, count.index)
+  availability_zone = data.aws_availability_zones.available.names[count.index]
+
+  map_public_ip_on_launch = true
+
+  tags = {
+    Name = "eks-subnet-${count.index}"
   }
 }
 
@@ -59,7 +75,7 @@ resource "aws_eks_cluster" "example" {
   ]
 
   vpc_config {
-    subnet_ids = data.aws_subnets.default_vpc_subnets.ids
+    subnet_ids = aws_subnet.eks_subnet[*].id
   }
 
   depends_on = [
@@ -110,7 +126,7 @@ resource "aws_eks_node_group" "example" {
   node_group_name = "Node-cloud"
   node_role_arn   = aws_iam_role.example1.arn
 
-  subnet_ids = data.aws_subnets.default_vpc_subnets.ids
+  subnet_ids = aws_subnet.eks_subnet[*].id
 
   scaling_config {
     desired_size = 1
