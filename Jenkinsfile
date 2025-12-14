@@ -42,7 +42,7 @@ pipeline {
             steps {
                 sh '''
                 cd /var/lib/jenkins/workspace/eks_deployment/EKS_Terraform
-                terraform init
+                terraform init -reconfigure -input=false
                 '''
             }
         }
