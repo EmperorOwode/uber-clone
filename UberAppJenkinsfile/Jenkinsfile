@@ -1,11 +1,6 @@
 pipeline {
     agent any
 
-    environment {
-        // You can remove this too if you’re not using Sonar anywhere else
-        // SCANNER_HOME = tool 'sonar-scanner'
-    }
-
     tools {
         nodejs 'node16'
     }
@@ -23,15 +18,11 @@ pipeline {
             }
         }
 
-        // 🚫 SonarQube stage removed for now
-        // stage("Sonarqube Analysis ") { ... }
-
-        // 🚫 Quality gate stage removed for now
-        // stage("quality gate") { ... }
+        // SonarQube + quality gate removed for now
 
         stage('Install Dependencies') {
             steps {
-                sh "npm install"
+                sh 'npm install'
             }
         }
 
@@ -41,7 +32,6 @@ pipeline {
                     additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit',
                     odcInstallation: 'DP-Check'
                 )
-
                 dependencyCheckPublisher(
                     pattern: '**/dependency-check-report.xml'
                 )
@@ -50,26 +40,26 @@ pipeline {
 
         stage('TRIVY FS SCAN') {
             steps {
-                sh "trivy fs . > trivyfs.json"
+                sh 'trivy fs . > trivyfs.json'
             }
         }
 
-        stage("Docker Build & Push") {
+        stage('Docker Build & Push') {
             steps {
                 script {
                     withDockerRegistry(credentialsId: 'dockerpass', toolName: 'docker') {
-                        sh "docker system prune -a -f --volumes"
-                        sh "docker build -t uber ."
-                        sh "docker tag uber emperorowode/uber:latest"
-                        sh "docker push emperorowode/uber:latest"
+                        sh 'docker system prune -a -f --volumes'
+                        sh 'docker build -t uber .'
+                        sh 'docker tag uber emperorowode/uber:latest'
+                        sh 'docker push emperorowode/uber:latest'
                     }
                 }
             }
         }
 
-        stage("TRIVY") {
+        stage('TRIVY') {
             steps {
-                sh "trivy image emperorowode/uber:latest > trivyimage.json"
+                sh 'trivy image emperorowode/uber:latest > trivyimage.json'
             }
         }
 
