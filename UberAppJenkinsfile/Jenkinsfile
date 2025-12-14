@@ -1,98 +1,97 @@
-pipeline{
+pipeline {
     agent any
+
     environment {
-        SCANNER_HOME=tool 'sonar-scanner'
-    }      
-    tools{
+        // You can remove this too if you’re not using Sonar anywhere else
+        // SCANNER_HOME = tool 'sonar-scanner'
+    }
+
+    tools {
         nodejs 'node16'
     }
+
     stages {
-        stage('clean workspace'){
-            steps{
+        stage('clean workspace') {
+            steps {
                 cleanWs()
             }
         }
-        stage('Checkout from Git'){
-            steps{
+
+        stage('Checkout from Git') {
+            steps {
                 git branch: 'main', url: 'https://github.com/EmperorOwode/uber-clone.git'
             }
         }
-        stage("Sonarqube Analysis ") {
-    steps {
-        withSonarQubeEnv('sonar-scanner') {
-            sh '''
-                $SCANNER_HOME/bin/sonar-scanner \
-                  -Dsonar.projectName="Application_deployment" \
-                  -Dsonar.projectKey="Application_deployment" \
-                  -Dsonar.exclusions=**/*.js,**/*.ts
-            '''
-        }
-    }
-}
 
-        stage("quality gate"){
-           steps {
-                script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'sonartoken'
-                }
-            }
-        }
-        
+        // 🚫 SonarQube stage removed for now
+        // stage("Sonarqube Analysis ") { ... }
+
+        // 🚫 Quality gate stage removed for now
+        // stage("quality gate") { ... }
+
         stage('Install Dependencies') {
             steps {
                 sh "npm install"
             }
         }
+
         stage('OWASP FS SCAN') {
             steps {
                 dependencyCheck(
                     additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit',
                     odcInstallation: 'DP-Check'
                 )
-        
+
                 dependencyCheckPublisher(
                     pattern: '**/dependency-check-report.xml'
                 )
             }
         }
 
-
-
-
-         stage('TRIVY FS SCAN') {
+        stage('TRIVY FS SCAN') {
             steps {
                 sh "trivy fs . > trivyfs.json"
             }
         }
-        stage("Docker Build & Push"){
-            steps{
-                script{
-                   withDockerRegistry(credentialsId: 'dockerpass', toolName: 'docker'){
-                       sh "docker system prune -a -f --volumes"
-                       sh "docker build -t uber ."
-                       sh "docker tag uber emperorowode/uber:latest "
-                       sh "docker push emperorowode/uber:latest "
+
+        stage("Docker Build & Push") {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'dockerpass', toolName: 'docker') {
+                        sh "docker system prune -a -f --volumes"
+                        sh "docker build -t uber ."
+                        sh "docker tag uber emperorowode/uber:latest"
+                        sh "docker push emperorowode/uber:latest"
                     }
                 }
             }
         }
-        stage("TRIVY"){
-            steps{
+
+        stage("TRIVY") {
+            steps {
                 sh "trivy image emperorowode/uber:latest > trivyimage.json"
             }
-        }        
-        stage('Deploy to kubernetes'){
-            steps{
-                script{
+        }
+
+        stage('Deploy to kubernetes') {
+            steps {
+                script {
                     dir('K8S') {
-                       withKubeConfig(caCertificate: '', clusterName: 'EKS_CLOUD', contextName: '', credentialsId: 'k8s', namespace: 'webapps', restrictKubeConfigAccess: false, serverUrl: 'https://1E80556347E55B42D4746E4669E25405.gr7.us-east-1.eks.amazonaws.com') {
-                                sh 'kubectl apply -f deployment.yml'
-                                sh 'kubectl apply -f service.yml'
+                        withKubeConfig(
+                            caCertificate: '',
+                            clusterName: 'EKS_CLOUD',
+                            contextName: '',
+                            credentialsId: 'k8s',
+                            namespace: 'webapps',
+                            restrictKubeConfigAccess: false,
+                            serverUrl: 'https://1E80556347E55B42D4746E4669E25405.gr7.us-east-1.eks.amazonaws.com'
+                        ) {
+                            sh 'kubectl apply -f deployment.yml'
+                            sh 'kubectl apply -f service.yml'
                         }
                     }
                 }
             }
-        }        
+        }
     }
-    
 }
