@@ -1,15 +1,13 @@
-cd /var/lib/jenkins/workspace/eks_deployment/EKS_Terraform
-
-# REPLACE the broken eks-cluster.tf with a clean working version
-cat <<'EOF' > eks-cluster.tf
 #############################
 # DATA SOURCES
 #############################
 
+# Get the default VPC in this region/account
 data "aws_vpc" "default" {
   default = true
 }
 
+# Get all subnets in that default VPC
 data "aws_subnets" "default_vpc_subnets" {
   filter {
     name   = "vpc-id"
@@ -128,6 +126,3 @@ resource "aws_eks_node_group" "example" {
     aws_iam_role_policy_attachment.example-AmazonEC2ContainerRegistryReadOnly,
   ]
 }
-EOF
-
-terraform validate
