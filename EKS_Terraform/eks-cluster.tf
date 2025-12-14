@@ -1,3 +1,6 @@
+cd /var/lib/jenkins/workspace/eks_deployment/EKS_Terraform
+
+# Overwrite eks-cluster.tf with a working config
 cat <<'EOF' > eks-cluster.tf
 #############################
 # DATA SOURCES
@@ -128,3 +131,7 @@ resource "aws_eks_node_group" "example" {
   ]
 }
 EOF
+
+# Re-init (safe) and validate
+terraform init -reconfigure -input=false
+terraform validate
