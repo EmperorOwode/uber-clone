@@ -1,3 +1,25 @@
+cat <<'EOF' > eks-cluster.tf
+#############################
+# DATA SOURCES
+#############################
+
+# Get the default VPC in this region/account
+data "aws_vpc" "default" {
+  default = true
+}
+
+# Get all subnets in that default VPC
+data "aws_subnets" "default_vpc_subnets" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+#############################
+# IAM FOR EKS CLUSTER
+#############################
+
 data "aws_iam_policy_document" "assume_role" {
   statement {
     effect = "Allow"
@@ -11,8 +33,6 @@ data "aws_iam_policy_document" "assume_role" {
   }
 }
 
-variable subnet_ids {}
-
 resource "aws_iam_role" "example" {
   name               = "eks-cluster-cloud_aws"
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
@@ -23,23 +43,14 @@ resource "aws_iam_role_policy_attachment" "example-AmazonEKSClusterPolicy" {
   role       = aws_iam_role.example.name
 }
 
-# Get default VPC
-data "aws_vpc" "default" {
-  default = true
-}
+#############################
+# EKS CLUSTER
+#############################
 
-#get subnets in that vpc
-data "aws_subnets" "default_vpc_subnets" {
-  filter {
-    name   = "vpc-id"
-    values = [data.aws_vpc.default.id]
-  }
-}
-#cluster provision
 resource "aws_eks_cluster" "example" {
   name     = "EKS_CLOUD"
   role_arn = aws_iam_role.example.arn
-  # Enable control plane logging
+
   enabled_cluster_log_types = [
     "api",
     "audit",
@@ -47,16 +58,19 @@ resource "aws_eks_cluster" "example" {
     "controllerManager",
     "scheduler"
   ]
+
   vpc_config {
-        subnet_ids = data.aws_subnets.default_vpc_subnets.ids
+    subnet_ids = data.aws_subnets.default_vpc_subnets.ids
   }
 
-  # Ensure that IAM Role permissions are created before and deleted after EKS Cluster handling.
-  # Otherwise, EKS will not be able to properly delete EKS managed EC2 infrastructure such as Security Groups.
   depends_on = [
     aws_iam_role_policy_attachment.example-AmazonEKSClusterPolicy,
   ]
 }
+
+#############################
+# IAM FOR NODE GROUP
+#############################
 
 resource "aws_iam_role" "example1" {
   name = "eks-node-group-cloud_aws"
@@ -88,11 +102,15 @@ resource "aws_iam_role_policy_attachment" "example-AmazonEC2ContainerRegistryRea
   role       = aws_iam_role.example1.name
 }
 
-#create node group
+#############################
+# NODE GROUP
+#############################
+
 resource "aws_eks_node_group" "example" {
   cluster_name    = aws_eks_cluster.example.name
   node_group_name = "Node-cloud"
   node_role_arn   = aws_iam_role.example1.arn
+
   subnet_ids = data.aws_subnets.default_vpc_subnets.ids
 
   scaling_config {
@@ -100,13 +118,13 @@ resource "aws_eks_node_group" "example" {
     max_size     = 2
     min_size     = 1
   }
+
   instance_types = ["t2.medium"]
 
-  # Ensure that IAM Role permissions are created before and deleted after EKS Node Group handling.
-  # Otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
   depends_on = [
     aws_iam_role_policy_attachment.example-AmazonEKSWorkerNodePolicy,
     aws_iam_role_policy_attachment.example-AmazonEKS_CNI_Policy,
     aws_iam_role_policy_attachment.example-AmazonEC2ContainerRegistryReadOnly,
   ]
 }
+EOF
