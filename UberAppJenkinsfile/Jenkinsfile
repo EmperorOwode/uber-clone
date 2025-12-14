@@ -1,7 +1,6 @@
 pipeline{
     agent any
     environment {
-        NVD_API_KEY= credentials('NVD_API_KEY')
         SCANNER_HOME=tool 'sonar-scanner'
     }      
     tools{
