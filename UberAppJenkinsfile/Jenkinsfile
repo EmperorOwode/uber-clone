@@ -17,14 +17,19 @@ pipeline{
                 git branch: 'main', url: 'https://github.com/EmperorOwode/uber-clone.git'
             }
         }
-        stage("Sonarqube Analysis "){
-            steps{
-                withSonarQubeEnv('sonar-scanner') {
-                    sh ''' $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectName="Application_deployment" \
-                    -Dsonar.projectKey="Application_deployment"'''
-                }
-            }
+        stage("Sonarqube Analysis ") {
+    steps {
+        withSonarQubeEnv('sonar-scanner') {
+            sh '''
+                $SCANNER_HOME/bin/sonar-scanner \
+                  -Dsonar.projectName="Application_deployment" \
+                  -Dsonar.projectKey="Application_deployment" \
+                  -Dsonar.exclusions=**/*.js,**/*.ts
+            '''
         }
+    }
+}
+
         stage("quality gate"){
            steps {
                 script {
