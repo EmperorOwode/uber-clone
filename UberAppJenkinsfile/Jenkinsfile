@@ -47,8 +47,7 @@ pipeline{
                 )
         
                 dependencyCheckPublisher(
-                    pattern: '**/dependency-check-report.xml',
-                    nvdCredentialsId: 'NVD_API_KEY'   // <-- correct parameter
+                    pattern: '**/dependency-check-report.xml'
                 )
             }
         }
