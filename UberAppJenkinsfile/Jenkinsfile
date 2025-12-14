@@ -15,7 +15,7 @@ pipeline{
         }
         stage('Checkout from Git'){
             steps{
-                git branch: 'main', url: 'https://github.com/tkibnyusuf/uber-clone.git'
+                git branch: 'main', url: 'https://github.com/EmperorOwode/uber-clone.git'
             }
         }
         stage("Sonarqube Analysis "){
@@ -67,15 +67,15 @@ pipeline{
                    withDockerRegistry(credentialsId: 'dockerpass', toolName: 'docker'){
                        sh "docker system prune -a -f --volumes"
                        sh "docker build -t uber ."
-                       sh "docker tag uber tkibnyusuf/uber:latest "
-                       sh "docker push tkibnyusuf/uber:latest "
+                       sh "docker tag uber emperorowode/uber:latest "
+                       sh "docker push emperorowode/uber:latest "
                     }
                 }
             }
         }
         stage("TRIVY"){
             steps{
-                sh "trivy image tkibnyusuf/uber:latest > trivyimage.json"
+                sh "trivy image emperorowode/uber:latest > trivyimage.json"
             }
         }        
         stage('Deploy to kubernetes'){
