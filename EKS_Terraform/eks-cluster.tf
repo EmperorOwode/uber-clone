@@ -1,8 +1,8 @@
 #############################
-# NETWORKING – SEPARATE VPC FOR EKS
+# NETWORKING – DEDICATED VPC FOR EKS
 #############################
 
-# Create a dedicated VPC for EKS (no overlap with default VPC)
+# VPC for EKS
 resource "aws_vpc" "eks_vpc" {
   cidr_block           = "10.0.0.0/16"
   enable_dns_support   = true
@@ -13,12 +13,35 @@ resource "aws_vpc" "eks_vpc" {
   }
 }
 
-# Get AZs in this region
+# Internet Gateway for public internet access
+resource "aws_internet_gateway" "eks_igw" {
+  vpc_id = aws_vpc.eks_vpc.id
+
+  tags = {
+    Name = "eks-igw"
+  }
+}
+
+# Route table for public subnets
+resource "aws_route_table" "eks_public_rt" {
+  vpc_id = aws_vpc.eks_vpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.eks_igw.id
+  }
+
+  tags = {
+    Name = "eks-public-rt"
+  }
+}
+
+# Get available AZs in the region
 data "aws_availability_zones" "available" {
   state = "available"
 }
 
-# Create 2 subnets in different AZs in the new VPC
+# Two public subnets in different AZs
 resource "aws_subnet" "eks_subnet" {
   count = 2
 
@@ -31,6 +54,14 @@ resource "aws_subnet" "eks_subnet" {
   tags = {
     Name = "eks-subnet-${count.index}"
   }
+}
+
+# Associate subnets with the public route table
+resource "aws_route_table_association" "eks_public_assoc" {
+  count = 2
+
+  subnet_id      = aws_subnet.eks_subnet[count.index].id
+  route_table_id = aws_route_table.eks_public_rt.id
 }
 
 #############################
@@ -55,8 +86,14 @@ resource "aws_iam_role" "example" {
   assume_role_policy = data.aws_iam_policy_document.assume_role.json
 }
 
+# Required policies for EKS control plane
 resource "aws_iam_role_policy_attachment" "example-AmazonEKSClusterPolicy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+  role       = aws_iam_role.example.name
+}
+
+resource "aws_iam_role_policy_attachment" "example-AmazonEKSServicePolicy" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSServicePolicy"
   role       = aws_iam_role.example.name
 }
 
@@ -82,6 +119,7 @@ resource "aws_eks_cluster" "example" {
 
   depends_on = [
     aws_iam_role_policy_attachment.example-AmazonEKSClusterPolicy,
+    aws_iam_role_policy_attachment.example-AmazonEKSServicePolicy,
   ]
 }
 
@@ -119,6 +157,12 @@ resource "aws_iam_role_policy_attachment" "example-AmazonEC2ContainerRegistryRea
   role       = aws_iam_role.example1.name
 }
 
+# Optional but recommended (SSM access to nodes)
+resource "aws_iam_role_policy_attachment" "example-AmazonSSMManagedInstanceCore" {
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+  role       = aws_iam_role.example1.name
+}
+
 #############################
 # NODE GROUP
 #############################
@@ -139,6 +183,7 @@ resource "aws_eks_node_group" "example" {
   instance_types = ["t2.medium"]
 
   depends_on = [
+    aws_eks_cluster.example,
     aws_iam_role_policy_attachment.example-AmazonEKSWorkerNodePolicy,
     aws_iam_role_policy_attachment.example-AmazonEKS_CNI_Policy,
     aws_iam_role_policy_attachment.example-AmazonEC2ContainerRegistryReadOnly,
