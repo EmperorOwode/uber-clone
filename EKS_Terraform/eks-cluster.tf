@@ -1,27 +1,29 @@
 #############################
-# DATA SOURCES
+# NETWORKING – SEPARATE VPC FOR EKS
 #############################
 
-# Default VPC
-data "aws_vpc" "default" {
-  default = true
+# Create a dedicated VPC for EKS (no overlap with default VPC)
+resource "aws_vpc" "eks_vpc" {
+  cidr_block           = "10.0.0.0/16"
+  enable_dns_support   = true
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "eks-vpc"
+  }
 }
 
-# All available AZs in this region
+# Get AZs in this region
 data "aws_availability_zones" "available" {
   state = "available"
 }
 
-#############################
-# NETWORKING FOR EKS
-#############################
-
-# Create 2 subnets in different AZs in the default VPC
+# Create 2 subnets in different AZs in the new VPC
 resource "aws_subnet" "eks_subnet" {
   count = 2
 
-  vpc_id            = data.aws_vpc.default.id
-  cidr_block        = cidrsubnet(data.aws_vpc.default.cidr_block, 8, count.index)
+  vpc_id            = aws_vpc.eks_vpc.id
+  cidr_block        = count.index == 0 ? "10.0.1.0/24" : "10.0.2.0/24"
   availability_zone = data.aws_availability_zones.available.names[count.index]
 
   map_public_ip_on_launch = true
