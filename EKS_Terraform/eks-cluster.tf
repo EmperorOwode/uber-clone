@@ -23,7 +23,12 @@ resource "aws_iam_role_policy_attachment" "example-AmazonEKSClusterPolicy" {
   role       = aws_iam_role.example.name
 }
 
-#get vpc data
+# Get default VPC
+data "aws_vpc" "default" {
+  default = true
+}
+
+#get subnets in that vpc
 data "aws_subnets" "default_vpc_subnets" {
   filter {
     name   = "vpc-id"
